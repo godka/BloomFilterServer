@@ -3,6 +3,8 @@
 #include "event2/buffer.h"
 #include "event2/event.h"
 #include "event2/http.h"
+#include "event2/http_struct.h"
+#include "event2/keyvalq_struct.h"
 #ifdef WIN32
 #include <Winsock2.h>
 #pragma comment(lib,"ws2_32")
@@ -11,7 +13,7 @@
 #include <stdio.h>
 #include "BloomFliter.h"
 void* bf_buf;
-
+#define CMP(x) strcmp(header->key, x) == 0
 #ifdef WIN32
 int init_win_socket()
 {
@@ -33,18 +35,20 @@ void generic_handler(struct evhttp_request *req, void *arg)
 		return;
 	}
 	const char*  reqbuf = evhttp_request_get_uri(req);
-	char tmp[512] = { 0 };
+	//puts(reqbuf);
+	struct evkeyvalq headers = { 0 };
+	struct evkeyval *header;
+	evhttp_parse_query_str(&reqbuf[1], &headers);
 
-	sscanf(reqbuf, "/add=%s", tmp);
-	if (strlen(tmp) > 0){
-		BF_Add(bf_buf, tmp, strlen(tmp));
-		evbuffer_add(buf, "ok", 2);
-		evhttp_send_reply(req, HTTP_OK, "ok", buf);
-	}
-	else{
-		sscanf(reqbuf, "/contain=%s", tmp);
-		if (strlen(tmp) > 0){
-			if (BF_Contains(bf_buf, tmp, strlen(tmp))){
+	for (header = headers.tqh_first; header;
+		header = header->next.tqe_next) {
+		if (CMP("add")){
+			BF_Add(bf_buf, header->value, strlen(header->value));
+			evbuffer_add(buf, "ok", 2);
+			evhttp_send_reply(req, HTTP_OK, "ok", buf);
+		}
+		else if (CMP("contain")){
+			if (BF_Contains(bf_buf, header->value, strlen(header->value))){
 				evbuffer_add(buf, "true", 4);
 				evhttp_send_reply(req, HTTP_OK, "ok", buf);
 			}
@@ -54,11 +58,9 @@ void generic_handler(struct evhttp_request *req, void *arg)
 			}
 		}
 		else{
-
 			evhttp_send_reply(req, HTTP_BADREQUEST, "Error Command", buf);
 		}
 	}
-
 	evbuffer_free(buf);
 }
 
