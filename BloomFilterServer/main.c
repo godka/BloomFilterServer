@@ -11,6 +11,8 @@
 #include <stdio.h>
 #include "BloomFliter.h"
 void* bf_buf;
+
+#ifdef WIN32
 int init_win_socket()
 {
 	WSADATA wsaData;
@@ -20,6 +22,7 @@ int init_win_socket()
 	}
 	return 0;
 }
+#endif
 
 void generic_handler(struct evhttp_request *req, void *arg)
 {
